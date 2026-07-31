@@ -12,10 +12,10 @@ describe('App Component (Integration Tests)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // 1. fetch のデフォルトモック（自動ロード失敗をシミュレートし、テストへの影響を防ぐ）
+    // fetch のデフォルトモック（自動ロード失敗をシミュレートし、テストへの影響を防ぐ）
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('File not found')));
 
-    // 2. クリップボード API のモック
+    // クリップボード API のモック
     Object.defineProperty(navigator, 'clipboard', {
       value: mockClipboard,
       writable: true,
@@ -27,7 +27,7 @@ describe('App Component (Integration Tests)', () => {
       configurable: true,
     });
 
-    // 3. URL クエリパラメータの初期化
+    // URL クエリパラメータの初期化
     window.history.pushState({}, '', '/');
   });
 
@@ -37,7 +37,14 @@ describe('App Component (Integration Tests)', () => {
     vi.restoreAllMocks();
   });
 
-  // --- ヘルパー関数: テスト用ダミーファイルのロード ---
+  const hasFullText = (text: string) => (_: string, element: Element | null) => {
+    const hasText = element?.textContent?.includes(text) ?? false;
+    const childrenDontHaveText = Array.from(element?.children || []).every(
+      child => !child.textContent?.includes(text)
+    );
+    return hasText && childrenDontHaveText;
+  };
+
   const loadDummyLogFile = async (inputElement: HTMLElement) => {
     const dummyLogContent = `
 M       /trunk/src/App.tsx
@@ -49,7 +56,6 @@ D       /trunk/docs/old.txt
     const file = new File([dummyLogContent], 'test.log', { type: 'text/plain' });
     fireEvent.change(inputElement, { target: { files: [file] } });
 
-    // FileReader の非同期読み込みを待機（正規表現マッチャーに変更）
     await screen.findByText(/src\/App\.tsx/);
   };
 
@@ -65,10 +71,8 @@ D       /trunk/docs/old.txt
   it('ファイル読み込み: ログファイルをドロップ/選択するとデータがパースされ一覧表示されること', async () => {
     render(<App />);
 
-    // ドロップゾーン内の隠し file input を取得
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).not.toBeNull();
-
     await loadDummyLogFile(fileInput);
 
     // ログが正しく表示されているか確認
@@ -87,19 +91,9 @@ D       /trunk/docs/old.txt
 
     const searchInput = screen.getByPlaceholderText(/🔍/);
     
-    // 'Header' で検索（ハイライト処理により文字列が <mark> 等で分断される）
+    // 'Header' で検索
     fireEvent.change(searchInput, { target: { value: 'Header' } });
-
-    // DOM分断に対応: 子要素を包含する最も内側の要素をテキスト全体で判定して取得
-    expect(
-      screen.getByText((_, element) => {
-        const hasText = element?.textContent?.includes('src/components/Header.tsx') ?? false;
-        const childrenDontHaveText = Array.from(element?.children || []).every(
-          child => !child.textContent?.includes('src/components/Header.tsx')
-        );
-        return hasText && childrenDontHaveText;
-      })
-    ).toBeInTheDocument();
+    expect(screen.getByText(hasFullText('src/components/Header.tsx'))).toBeInTheDocument();
 
     // App.tsx は絞り込まれて画面から消えていること
     expect(screen.queryByText(/src\/App\.tsx/)).toBeNull();
