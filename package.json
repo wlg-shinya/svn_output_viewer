@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && move dist\\index.html dist\\svn_output_viewer.html",
     "lint": "eslint .",
     "preview": "vite preview"
   },
